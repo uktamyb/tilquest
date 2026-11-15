@@ -174,6 +174,10 @@ h2{padding-right:7rem}
 .psg{max-height:36vh;overflow:auto;background:var(--card);border:1px solid var(--bd);border-radius:1rem;padding:1rem 1.4rem;font-size:clamp(1rem,2vw,1.35rem);line-height:1.6;text-align:left}
 .psg h3{margin:0 0 .6rem}
 .psg p{margin:.5rem 0}
+h2{padding-right:9rem}
+#voiceBtn{width:auto;padding:0 1rem;border-radius:999px;font-size:1rem;font-family:inherit;font-weight:600}
+#voicePanel .sp{font:inherit;font-size:.95rem;padding:.35rem .8rem;border-radius:999px;border:1px solid var(--bd);background:var(--card);color:var(--fg);cursor:pointer}
+#voicePanel .sp.on{background:var(--a);color:#fff;border-color:var(--a)}
 </style>
 </head>
 <body>
@@ -831,6 +835,45 @@ function say(t){
   if(window.AUD&&AUD[k]){playAud(k).catch(()=>sayTTS(t));return}
   sayTTS(t);
 }
+
+// ---- Tezlik: -3x ... 3x (ovoz balandligi saqlanadi) ----
+const SPD=[['-3x',.5],['-2x',.65],['-1x',.8],['1x',1],['2x',1.25],['3x',1.5]];
+let SPEED=.8;
+try{const sv=parseFloat(localStorage.getItem('speed'));if(sv)SPEED=sv}catch(e){}
+const ABLOB={};let curA=null;
+async function playAud(k){
+  try{if(curA){curA.pause();curA=null}}catch(e){}
+  try{if(curSrc)curSrc.stop()}catch(e){}
+  const bin=atob(AUD[k]),u=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);
+  if(!ABLOB[k])ABLOB[k]=URL.createObjectURL(new Blob([u],{type:'audio/mpeg'}));
+  try{
+    const a=new Audio(ABLOB[k]);a.preservesPitch=true;a.mozPreservesPitch=true;a.webkitPreservesPitch=true;a.playbackRate=SPEED;
+    curA=a;await a.play();return;
+  }catch(e){}
+  // Zaxira: WebAudio (tezlik o'zgarsa ovoz balandligi ham biroz o'zgaradi)
+  actx=actx||new(window.AudioContext||window.webkitAudioContext)();
+  if(actx.state==='suspended')await actx.resume();
+  const b=await actx.decodeAudioData(u.buffer.slice(0));
+  const s=actx.createBufferSource();s.buffer=b;s.playbackRate.value=SPEED;s.connect(actx.destination);s.start();curSrc=s;
+}
+function sayTTS(t){
+  try{
+    const u=new SpeechSynthesisUtterance(/[.?!]$/.test(t)?t:t+'.');
+    if(VOICE){u.voice=VOICE;u.lang=VOICE.lang}else u.lang='en-GB';
+    u.rate=Math.max(.3,Math.min(1.6,.9*SPEED));speechSynthesis.speak(u);
+  }catch(e){}
+}
+const sr=document.createElement('div');sr.style.cssText='display:flex;flex-wrap:wrap;gap:.4rem';
+sr.innerHTML="<b style='width:100%'>Speed</b>";
+SPD.forEach(([l,v])=>{const b=document.createElement('button');b.className='sp';b.textContent=l;b.title=v+'x';b.dataset.v=v;
+  b.onclick=()=>{SPEED=v;try{localStorage.setItem('speed',v)}catch(e){}markSp();say('Ali is a teacher.')};sr.appendChild(b)});
+vp.insertBefore(sr,vp.querySelector('p'));
+function markSp(){
+  sr.querySelectorAll('.sp').forEach(b=>b.classList.toggle('on',+b.dataset.v===SPEED));
+  const f=SPD.find(x=>x[1]===SPEED);vb.textContent='🔊 '+(f?f[0]:SPEED+'x');
+}
+markSp();
 
 // Light/dark tema (tanlov saqlanadi)
 (function(){
